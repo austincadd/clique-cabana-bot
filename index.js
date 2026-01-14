@@ -1,4 +1,7 @@
-require("dotenv").config();
+// Load dotenv only when running locally (Railway provides env vars without .env)
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 const fs = require("fs");
 const path = require("path");
@@ -23,10 +26,11 @@ const DATA_DIR = path.join(__dirname, "data");
 const OPTINS_PATH = path.join(DATA_DIR, "optins.json");
 const EVENTS_PATH = path.join(__dirname, "events.json");
 
-// Channel where reminders get posted (public, no spammy welcomes)
-const EVENT_CHANNEL_ID = process.env.EVENT_CHANNEL_ID;
+// Channel IDs
+const EVENT_CHANNEL_ID = process.env.EVENT_CHANNEL_ID;     // #upcoming-events (or announcements)
+const WELCOME_CHANNEL_ID = process.env.WELCOME_CHANNEL_ID; // #welcome
 
-// For slash commands (guild commands are easiest while developing)
+// Slash commands (guild-only during development)
 const GUILD_ID = process.env.GUILD_ID;
 
 // ============================
@@ -74,12 +78,22 @@ function readEvents() {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers, // needed for join welcome
+    GatewayIntentBits.GuildMembers, // join events
   ],
 });
 
 // ============================
-// Clique Cabana: Private personalized DM welcome
+// Copy: Public welcome text (EXACT)
+// ============================
+const PUBLIC_WELCOME_TEXT =
+`Welcome to the Clique Cabana Discord!
+This is the home base for our house music family—a collective rooted in Atlanta, built on rhythm, culture, and community. We throw house music events across the city and beyond, bringing together dancers, DJs, creators, and music lovers who live for the groove.
+Here you’ll find event announcements, mixes, artist spotlights, and space to connect with like-minded people shaping the sound and culture of Atlanta and surrounding cities. Whether you’re behind the decks, on the dance floor, or just discovering the scene, you’re part of the clique now.
+Respect the vibe, support each other, and let the music move you.
+Welcome to the Clique 🖤`;
+
+// ============================
+// Private personalized DM welcome (culture-first)
 // ============================
 async function sendPersonalWelcomeDM(member) {
   const displayName = member.displayName || member.user.username;
@@ -90,31 +104,102 @@ async function sendPersonalWelcomeDM(member) {
   let extraLine = "";
   if (accountAgeDays < 30) {
     extraLine =
-      "\nIf you’re new to Discord or the scene, no stress — ask questions anytime.";
+      "\n\nIf you’re new to Discord or the scene, no stress — ask questions anytime.";
   } else if (accountAgeDays > 365) {
     extraLine =
-      "\nLooks like you’ve been around for a minute — glad you found your way here.";
+      "\n\nLooks like you’ve been around for a minute — glad you found your way here.";
   }
 
-  const message =
+  const dm =
 `Welcome **${displayName}** 🖤
 
-Welcome to the **Clique Cabana Discord**!
-This is the home base for our house music family — a collective rooted in **Atlanta**, built on rhythm, culture, and community.
-
-We throw house music events across the city and beyond, bringing together dancers, DJs, creators, and music lovers who live for the groove.
-
-Here you’ll find event announcements, mixes, artist spotlights, and space to connect with like-minded people shaping the sound and culture of Atlanta and surrounding cities. Whether you’re behind the decks, on the dance floor, or just discovering the scene, you’re part of the clique now.
-
-Respect the vibe, support each other, and let the music move you.${extraLine}
-
-Welcome to the Clique 🖤`;
+${PUBLIC_WELCOME_TEXT}${extraLine}`;
 
   try {
-    await member.send(message);
+    await member.send(dm);
   } catch {
-    // DMs closed — silently ignore
+    // DMs closed — ignore
   }
+}
+
+// ============================
+// Public welcome in #welcome (one message per join)
+// ============================
+async function postWelcomeInWelcomeChannel(member) {
+  if (!WELCOME_CHANNEL_ID) return;
+
+  const channel = await client.channels.fetch(WELCOME_CHANNEL_ID).catch(() => null);
+  if (!channel) return;
+
+  // Keep your exact copy, but make it feel like it's addressed to them
+  const embed = new EmbedBuilder()
+    .setTitle("Welcome to Clique Cabana 🖤")
+    .setDescription(PUBLIC_WELCOME_TEXT)
+    .setThumbnail(member.user.displayAvatarURL({ size: 256 }))
+    .setFooter({ text: "Respect the vibe. Support each other. Let the music move you." })
+    .setTimestamp();
+
+  // Mention them in a small line, while keeping your text exactly intact in the embed
+  await channel.send({
+    content: `Welcome ${member} 🖤`,
+    embeds: [embed],
+  });
+}
+
+// ============================
+// Pinned text in #upcoming-events (bot posts & pins once)
+// ============================
+const UPCOMING_EVENTS_PIN_MARKER = "CC_UPCOMING_EVENTS_PIN_V1";
+
+function buildUpcomingEventsPinnedText() {
+  // EXACT event list text you requested
+  return (
+`**Clique Cabana • Upcoming Events**
+
+Clique Cabana Presents: In the Clouds
+
+Friday, February 7
+Lee Foss
+
+Friday, February 27
+Justin Martin
+
+Friday, March 7
+Kyle Walker
+
+—
+**How to use this channel**
+• Use **/nextevent** to see the next upcoming event (private, just for you)
+• Use **/remindme** to get a DM reminder before events
+• Reminders post here **24 hours** and **2 hours** before showtime
+
+No spam. No noise. Just what’s next.
+See you in the clouds 🖤
+
+${UPCOMING_EVENTS_PIN_MARKER}`
+  );
+}
+
+async function ensurePinnedUpcomingEventsMessage() {
+  if (!EVENT_CHANNEL_ID) return;
+
+  const channel = await client.channels.fetch(EVENT_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  // Requires Manage Messages permission to fetch pins and pin messages
+  const pins = await channel.messages.fetchPinned().catch(() => null);
+  if (pins) {
+    const alreadyPinned = pins.find(
+      (m) => m.author?.id === client.user.id && m.content?.includes(UPCOMING_EVENTS_PIN_MARKER)
+    );
+    if (alreadyPinned) return; // done
+  }
+
+  // Not found -> post & pin
+  const msg = await channel.send(buildUpcomingEventsPinnedText());
+  await msg.pin().catch(() => {
+    console.log("⚠️ Could not pin message (missing Manage Messages permission).");
+  });
 }
 
 // ============================
@@ -185,21 +270,17 @@ function formatEventEmbed(event) {
 
 // ============================
 // Reminder engine
-// Posts to EVENT_CHANNEL_ID and (optionally) DMs opt-ins.
+// - Posts to EVENT_CHANNEL_ID
+// - DMs opt-ins
 // ============================
-const reminderState = new Set(); 
-// we’ll store keys like `${eventId}:24h` and `${eventId}:2h` in-memory
-// (simple + reliable as long as the process stays up)
+const reminderState = new Set();
 
 async function runReminderCheck() {
   const events = readEvents();
   const next = getNextEvent(events);
   if (!next) return;
 
-  if (!EVENT_CHANNEL_ID) {
-    console.log("⚠️ EVENT_CHANNEL_ID not set — reminders won’t post.");
-    return;
-  }
+  if (!EVENT_CHANNEL_ID) return;
 
   const channel = await client.channels.fetch(EVENT_CHANNEL_ID).catch(() => null);
   if (!channel) return;
@@ -209,35 +290,42 @@ async function runReminderCheck() {
 
   const minutesUntil = Math.round(start.diff(now, "minutes").minutes);
 
-  // Reminder thresholds
+  // Reminder windows
   const windows = [
     { label: "24h", minutes: 24 * 60, message: "⏳ **24 hours** until the next Clique Cabana." },
-    { label: "2h", minutes: 2 * 60, message: "🔥 **2 hours** until Clique Cabana. Pre-game accordingly." },
+    { label: "2h", minutes: 2 * 60, message: "🔥 **2 hours** until Clique Cabana. See you on the floor." },
   ];
 
   for (const w of windows) {
     const key = `${next.id}:${w.label}`;
-    // Trigger when we are within a 2-minute window to avoid missing
+
+    // Trigger within a small window to avoid missing due to timing
     const shouldTrigger = Math.abs(minutesUntil - w.minutes) <= 1;
 
     if (shouldTrigger && !reminderState.has(key)) {
       reminderState.add(key);
 
-      // Public reminder (no welcome spam, just event vibe)
       const embed = formatEventEmbed(next);
       await channel.send({ content: w.message, embeds: [embed] });
 
-      // Optional DMs to opt-ins
+      // DM opt-ins
       const optins = readOptins();
-      if (optins.dmOptInUserIds?.length) {
-        for (const userId of optins.dmOptInUserIds) {
+      const ids = optins.dmOptInUserIds || [];
+      if (ids.length) {
+        for (const userId of ids) {
           const user = await client.users.fetch(userId).catch(() => null);
           if (!user) continue;
 
           try {
-            await user.send(`${w.message}\n\n${next.title}\n${start.toFormat("cccc, LLL d • h:mm a")}\n${next.location || "TBA"}${next.link ? `\n${next.link}` : ""}`);
+            await user.send(
+              `${w.message}\n\n` +
+              `**${next.title}**\n` +
+              `${start.toFormat("cccc, LLL d • h:mm a")}\n` +
+              `${next.location || "TBA"}` +
+              (next.link ? `\n${next.link}` : "")
+            );
           } catch {
-            // user DMs closed; ignore
+            // DMs closed
           }
         }
       }
@@ -246,15 +334,15 @@ async function runReminderCheck() {
 }
 
 // ============================
-// Events
+// Bot lifecycle
 // ============================
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
-  // Register slash commands (guild)
   await registerSlashCommands();
+  await ensurePinnedUpcomingEventsMessage();
 
-  // Run reminders every minute
+  // Every minute reminder loop
   cron.schedule("* * * * *", async () => {
     await runReminderCheck();
   });
@@ -263,7 +351,10 @@ client.once("ready", async () => {
 });
 
 client.on("guildMemberAdd", async (member) => {
-  // Private welcome DM only
+  // 1) Public welcome in #welcome (your requested text)
+  await postWelcomeInWelcomeChannel(member);
+
+  // 2) Private DM welcome (personalized)
   await sendPersonalWelcomeDM(member);
 });
 
@@ -278,9 +369,7 @@ client.on("interactionCreate", async (interaction) => {
       await interaction.reply({ content: "No upcoming events listed yet 🖤", ephemeral: true });
       return;
     }
-
-    const embed = formatEventEmbed(next);
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [formatEventEmbed(next)], ephemeral: true });
     return;
   }
 
@@ -292,7 +381,7 @@ client.on("interactionCreate", async (interaction) => {
     writeOptins(optins);
 
     await interaction.reply({
-      content: "✅ You’re opted in. I’ll DM you reminders before Clique Cabana events.",
+      content: "✅ You’re opted in. I’ll DM you reminders before events.",
       ephemeral: true,
     });
     return;

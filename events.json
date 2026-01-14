@@ -1,13 +1,18 @@
 {
   "events": [
     {
-      "id": "clique-001",
-      "title": "Clique Cabana • House Night",
-      "description": "House music family 🖤",
-      "startISO": "2026-01-24T22:00:00",
-      "location": "Atlanta, GA (TBA)",
+      "id": "in-the-clouds-lee-foss-2026-02-07",
+      "title": "Clique Cabana Presents: In the Clouds • Lee Foss",
       "link": "",
-      "imageUrl": ""
+      "imageUrl": "CC_INTHECLOUDSNEW2.JPEG"
+    },
+    {
+      "id": "in-the-clouds-justin-martin-2026-02-27",
+      "title": "Clique Cabana Presents: In the Clouds • Justin Martin",
+    },
+    {
+      "id": "in-the-clouds-kyle-walker-2026-03-07",
+      "title": "Clique Cabana Presents: In the Clouds • Kyle Walker",
     }
   ]
 }
