@@ -192,10 +192,6 @@ function buildUpcomingEventsPinnedText() {
 ${whenLine}
 ${ticketLine}
 
-Clique Cabana • Upcoming Events 
-
-Clique Cabana Presents: In The Clouds W/ Lee Foss 
-
 Saturday 7 Feb from 2:00 PM to 10:00 PM
 
 ---
