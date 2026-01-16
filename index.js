@@ -192,7 +192,7 @@ function buildUpcomingEventsPinnedText() {
 ${whenLine}
 ${ticketLine}
 
-Saturday 7 Feb from 2:00 PM to 10:00 PM
+Lee Foss | Saturday 7 Feb from 2:00 PM to 10:00 PM
 
 ---
 How to use this channel 
