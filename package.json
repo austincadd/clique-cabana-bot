@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "discord.js": "^14.15.0",
-    "dotenv": "^16.4.0",
+    "dotenv": "^17.2.3",
     "luxon": "^3.4.4",
     "node-cron": "^3.0.3"
   }
