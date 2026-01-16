@@ -192,19 +192,19 @@ function buildUpcomingEventsPinnedText() {
 ${whenLine}
 ${ticketLine}
 
-Friday, February 21
-Justin Martin
+Clique Cabana • Upcoming Events 
 
-Friday, March 7
-Kyle Walker
+Clique Cabana Presents: In The Clouds W/ Lee Foss 
 
-—
-**How to use this channel**
-• Use **/nextevent** to see the next upcoming event (private, just for you)
-• Use **/remindme** to get a DM reminder before events
-• Reminders post here **24 hours** before showtime
+Saturday 7 Feb from 2:00 PM to 10:00 PM
 
-No spam. No noise. Just what’s next.
+---
+How to use this channel 
+• Use /nextevent to see the next upcoming event (private, just for you) 
+• Use /remindme to get a DM reminder before events 
+• Reminders post here 24 hours before showtime 
+
+No spam. No noise. Just what’s next. 
 See you in the clouds 🖤
 
 ${UPCOMING_EVENTS_PIN_MARKER}`;
